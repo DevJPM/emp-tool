@@ -1,7 +1,7 @@
 #ifndef EMP_CONFIG_H__
 #define EMP_CONFIG_H__
 namespace emp {
-const static int AES_BATCH_SIZE = 8;
+const static int AES_BATCH_SIZE = 16;
 const static int HASH_BUFFER_SIZE = 1024*8;
 const static int NETWORK_BUFFER_SIZE2 = 1024*32;
 const static int NETWORK_BUFFER_SIZE = 1024*1024;

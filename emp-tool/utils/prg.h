@@ -84,15 +84,25 @@ class PRG { public:
 		}
 	}
 
+	__attribute__((target("avx512f")))
 	void random_block(block * data, int nblocks=1) {
 		block tmp[AES_BATCH_SIZE];
+		__m512i local_counter = _mm512_set_epi64(0,counter+3,0,counter+2,0,counter+1,0,counter+0);
+		__m512i diff = _mm512_maskz_set1_epi64(0x55,4); // 0b01'01'01'01
 		for(int i = 0; i < nblocks/AES_BATCH_SIZE; ++i) {
-			for (int j = 0; j < AES_BATCH_SIZE; ++j)
-				tmp[j] = makeBlock(0LL, counter++);
-			AES_ecb_encrypt_blks<AES_BATCH_SIZE>(tmp, &aes);
-			memcpy(data + i*AES_BATCH_SIZE, tmp, AES_BATCH_SIZE*sizeof(block));
+			static_assert(AES_BATCH_SIZE % 4 == 0, "VAES requires the batch size being a multiple of 4.");	
+
+			for (int j = 0; j < AES_BATCH_SIZE/4; ++j)
+			{
+				_mm512_storeu_si512((__m512i*)(data + i * AES_BATCH_SIZE + j*4), local_counter);
+				local_counter = _mm512_add_epi64(local_counter, diff);
+			}
+				//tmp[j] = makeBlock(0LL, counter++);
+			AES_ecb_encrypt_blks<AES_BATCH_SIZE>(data+ i * AES_BATCH_SIZE, &aes);
+			//memcpy(data + i*AES_BATCH_SIZE, tmp, AES_BATCH_SIZE*sizeof(block));
 		}
 		int remain = nblocks % AES_BATCH_SIZE;
+		counter += nblocks - remain;
 		for (int j = 0; j < remain; ++j)
 			tmp[j] = makeBlock(0LL, counter++);
 		AES_ecb_encrypt_blks(tmp, remain, &aes);
