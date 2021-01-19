@@ -12,7 +12,8 @@ namespace emp {
 
 template<int BatchSize = 8>
 class MITCCRH { public:
-	AES_KEY scheduled_key[BatchSize];
+	//AES_KEY scheduled_key[BatchSize];
+	block scheduled_key[BatchSize * 11];
 	block keys[BatchSize];
 	int key_used = BatchSize;
 	block start_point;
@@ -51,7 +52,7 @@ class MITCCRH { public:
 		for(int i = 0; i < K*H; ++i)
 			tmp[i] = blks[i];
 		
-		ParaEnc<K,H>(tmp, scheduled_key+key_used);
+		ParaEnc<BatchSize,K,H>(tmp, scheduled_key,key_used);
 		key_used += K;
 		
 		for(int i = 0; i < K*H; ++i)

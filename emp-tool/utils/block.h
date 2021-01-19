@@ -111,11 +111,11 @@ inline bool cmpBlock(const block * x, const block * y, int nblocks) {
 #define OUT(x, y) out[(y)*nrows / 8 + (x) / 8]
 
 #ifdef __x86_64__
-__attribute__((target("sse2")))
+__attribute__((target("sse2,avx512f,avx512bw")))
 #endif
 inline void sse_trans(uint8_t *out, uint8_t const *inp, uint64_t nrows,
                uint64_t ncols) {
-  uint64_t rr, cc;
+  uint64_t rr=0, cc=0;
   int i, h;
   union {
     __m128i x;
@@ -123,10 +123,45 @@ inline void sse_trans(uint8_t *out, uint8_t const *inp, uint64_t nrows,
   } tmp;
   __m128i vec;
   assert(nrows % 8 == 0 && ncols % 8 == 0);
+  assert(nrows >= 64);
+
+
+  __m512i avx512vec;
+  // Do the main body in 64x8 blocks:
+  for (; rr <= nrows - 64; rr += 64) {
+      for (cc=0; cc < ncols; cc += 8) {
+          avx512vec = _mm512_set_epi8(INP(rr + 15 + 48, cc), INP(rr + 14 + 48, cc), INP(rr + 13 + 48, cc),
+              INP(rr + 12 + 48, cc), INP(rr + 11 + 48, cc), INP(rr + 10 + 48, cc),
+              INP(rr + 9 + 48, cc), INP(rr + 8 + 48, cc), INP(rr + 7 + 48, cc),
+              INP(rr + 6 + 48, cc), INP(rr + 5 + 48, cc), INP(rr + 4 + 48, cc),
+              INP(rr + 3 + 48, cc), INP(rr + 2 + 48, cc), INP(rr + 1 + 48, cc),
+              INP(rr + 0 + 48, cc),
+              INP(rr + 15 + 32, cc), INP(rr + 14 + 32, cc), INP(rr + 13 + 32, cc),
+              INP(rr + 12 + 32, cc), INP(rr + 11 + 32, cc), INP(rr + 10 + 32, cc),
+              INP(rr + 9 + 32, cc), INP(rr + 8 + 32, cc), INP(rr + 7 + 32, cc),
+              INP(rr + 6 + 32, cc), INP(rr + 5 + 32, cc), INP(rr + 4 + 32, cc),
+              INP(rr + 3 + 32, cc), INP(rr + 2 + 32, cc), INP(rr + 1 + 32, cc),
+              INP(rr + 0 + 32, cc),
+              INP(rr + 15 + 16, cc), INP(rr + 14 + 16, cc), INP(rr + 13 + 16, cc),
+              INP(rr + 12 + 16, cc), INP(rr + 11 + 16, cc), INP(rr + 10 + 16, cc),
+              INP(rr + 9 + 16, cc), INP(rr + 8 + 16, cc), INP(rr + 7 + 16, cc),
+              INP(rr + 6 + 16, cc), INP(rr + 5 + 16, cc), INP(rr + 4 + 16, cc),
+              INP(rr + 3 + 16, cc), INP(rr + 2 + 16, cc), INP(rr + 1 + 16, cc),
+              INP(rr + 0 + 16, cc),
+              INP(rr + 15, cc), INP(rr + 14, cc), INP(rr + 13, cc),
+              INP(rr + 12, cc), INP(rr + 11, cc), INP(rr + 10, cc),
+              INP(rr + 9, cc), INP(rr + 8, cc), INP(rr + 7, cc),
+              INP(rr + 6, cc), INP(rr + 5, cc), INP(rr + 4, cc),
+              INP(rr + 3, cc), INP(rr + 2, cc), INP(rr + 1, cc),
+              INP(rr + 0, cc));
+          for (i = 8; --i >= 0; avx512vec = _mm512_slli_epi64(avx512vec, 1))
+              *(uint64_t*)&OUT(rr, cc + i) = _mm512_movepi8_mask(avx512vec);
+      }
+  }
 
   // Do the main body in 16x8 blocks:
-  for (rr = 0; rr <= nrows - 16; rr += 16) {
-    for (cc = 0; cc < ncols; cc += 8) {
+  for (; rr <= nrows - 16; rr += 16) {
+    for (cc=0; cc < ncols; cc += 8) {
       vec = _mm_set_epi8(INP(rr + 15, cc), INP(rr + 14, cc), INP(rr + 13, cc),
                          INP(rr + 12, cc), INP(rr + 11, cc), INP(rr + 10, cc),
                          INP(rr + 9, cc), INP(rr + 8, cc), INP(rr + 7, cc),
